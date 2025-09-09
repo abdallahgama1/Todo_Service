@@ -1,155 +1,78 @@
+// repositories/todo_repository.go
+
 package repositories
 
 import (
 	"Todo_Service/models"
-	"database/sql"
-	"fmt"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 type TodoRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewTodoRepository(db *sql.DB) *TodoRepository {
+func NewTodoRepository(db *gorm.DB) *TodoRepository {
 	return &TodoRepository{db: db}
 }
 
-func (r *TodoRepository) InitDB() error {
-	query := `
-    CREATE TABLE IF NOT EXISTS todos (
-        id SERIAL PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        completed BOOLEAN NOT NULL,
-        category VARCHAR(50) NOT NULL,
-        priority VARCHAR(10) NOT NULL,
-        completedAt TIMESTAMPTZ,
-        dueDate TIMESTAMPTZ
-    );`
-	_, err := r.db.Exec(query)
-	return err
-}
-
-func scanTodos(rows *sql.Rows) ([]models.Todo, error) {
-	todos := []models.Todo{}
-	for rows.Next() {
-		var t models.Todo
-		if err := rows.Scan(&t.ID, &t.Title, &t.Completed, &t.Category, &t.Priority, &t.CompletedAt, &t.DueDate); err != nil {
-			return nil, err
-		}
-		todos = append(todos, t)
-	}
-	return todos, nil
-}
-
 func (r *TodoRepository) GetAll() ([]models.Todo, error) {
-	rows, err := r.db.Query("SELECT * FROM todos ORDER BY id ASC")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTodos(rows)
+	var todos []models.Todo
+	result := r.db.Find(&todos)
+	return todos, result.Error
 }
 
-func (r *TodoRepository) GetByID(id int) (*models.Todo, error) {
-	var t models.Todo
-	err := r.db.QueryRow("SELECT * FROM todos WHERE id = $1", id).Scan(&t.ID, &t.Title, &t.Completed, &t.Category, &t.Priority, &t.CompletedAt, &t.DueDate)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // Not found
-		}
-		return nil, err
-	}
-	return &t, nil
+func (r *TodoRepository) GetByID(id uint) (*models.Todo, error) {
+	var todo models.Todo
+
+	result := r.db.First(&todo, id)
+	return &todo, result.Error
 }
 
 func (r *TodoRepository) GetByCategory(category string) ([]models.Todo, error) {
-	rows, err := r.db.Query("SELECT * FROM todos WHERE category = $1 ORDER BY id ASC", category)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTodos(rows)
+	var todos []models.Todo
+	result := r.db.Where("category = ?", category).Find(&todos)
+	return todos, result.Error
 }
 
 func (r *TodoRepository) GetByStatus(completed bool) ([]models.Todo, error) {
-	rows, err := r.db.Query("SELECT * FROM todos WHERE completed = $1 ORDER BY id ASC", completed)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTodos(rows)
+	var todos []models.Todo
+	result := r.db.Where("completed = ?", completed).Find(&todos)
+	return todos, result.Error
 }
 
 func (r *TodoRepository) SearchByTitle(query string) ([]models.Todo, error) {
-	rows, err := r.db.Query("SELECT * FROM todos WHERE LOWER(title) LIKE $1 ORDER BY id ASC", "%"+strings.ToLower(query)+"%")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTodos(rows)
+	var todos []models.Todo
+	result := r.db.Where("LOWER(title) LIKE ?", "%"+strings.ToLower(query)+"%").Find(&todos)
+	return todos, result.Error
 }
 
-func (r *TodoRepository) Create(todo models.Todo) (*models.Todo, error) {
-	query := `
-    INSERT INTO todos (title, completed, category, priority, dueDate, completedAt)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING id`
+func (r *TodoRepository) Create(todo *models.Todo) (*models.Todo, error) {
 
-	var id int
-	err := r.db.QueryRow(query, todo.Title, todo.Completed, todo.Category, todo.Priority, todo.DueDate, todo.CompletedAt).Scan(&id)
-	if err != nil {
-		return nil, err
-	}
-	todo.ID = id
-	return &todo, nil
+	result := r.db.Create(todo)
+	return todo, result.Error
 }
 
-func (r *TodoRepository) Update(id int, todo models.Todo) (*models.Todo, error) {
-	query := `
-    UPDATE todos
-    SET title = $1, completed = $2, category = $3, priority = $4, dueDate = $5, completedAt = $6
-    WHERE id = $7`
+func (r *TodoRepository) Update(todo *models.Todo) (*models.Todo, error) {
 
-	result, err := r.db.Exec(query, todo.Title, todo.Completed, todo.Category, todo.Priority, todo.DueDate, todo.CompletedAt, id)
-	if err != nil {
-		return nil, err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return nil, err
-	}
-	if rowsAffected == 0 {
-		return nil, fmt.Errorf("todo not found")
-	}
-
-	todo.ID = id
-	return &todo, nil
+	result := r.db.Save(todo)
+	return todo, result.Error
 }
 
-func (r *TodoRepository) UpdateStatusByCategory(category string, completed bool, completedAt sql.NullString) error {
-	query := `UPDATE todos SET completed = $1, completedAt = $2 WHERE category = $3`
-	_, err := r.db.Exec(query, completed, completedAt, category)
-	return err
+func (r *TodoRepository) UpdateStatusByCategory(category string, completed bool, completedAt *gorm.DeletedAt) error {
+
+	result := r.db.Model(&models.Todo{}).Where("category = ?", category).Updates(map[string]interface{}{"completed": completed, "completed_at": completedAt})
+	return result.Error
 }
 
-func (r *TodoRepository) Delete(id int) error {
-	result, err := r.db.Exec("DELETE FROM todos WHERE id = $1", id)
-	if err != nil {
-		return err
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return fmt.Errorf("todo not found")
-	}
-	return nil
+func (r *TodoRepository) Delete(id uint) error {
+
+	result := r.db.Delete(&models.Todo{}, id)
+	return result.Error
 }
 
 func (r *TodoRepository) DeleteAll() error {
-	_, err := r.db.Exec("DELETE FROM todos")
-	return err
+	result := r.db.Unscoped().Where("1 = 1").Delete(&models.Todo{})
+	return result.Error
 }

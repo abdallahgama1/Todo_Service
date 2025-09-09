@@ -4,9 +4,10 @@ import (
 	"Todo_Service/models"
 	"Todo_Service/repositories"
 	"Todo_Service/utils"
-	"database/sql"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type TodoService struct {
@@ -27,31 +28,33 @@ func (s *TodoService) CreateTodo(req models.CreateTodoRequest) (*models.Todo, er
 		}
 	}
 
-	var dueDate sql.NullString
-	if req.DueDate != nil {
-		dueDate.String = *req.DueDate
-		dueDate.Valid = true
+	newTodo := &models.Todo{
+		Title:     req.Title,
+		Completed: req.Completed,
+		Category:  req.Category,
+		Priority:  strings.Title(strings.ToLower(req.Priority)),
 	}
 
-	var completedAt sql.NullString
 	if req.Completed {
-		completedAt.String = time.Now().UTC().Format(time.RFC3339)
-		completedAt.Valid = true
+		now := gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
+		newTodo.CompletedAt = &now
 	}
 
-	newTodo := models.Todo{
-		Title:       req.Title,
-		Completed:   req.Completed,
-		Category:    req.Category,
-		Priority:    strings.Title(strings.ToLower(req.Priority)),
-		DueDate:     dueDate,
-		CompletedAt: completedAt,
+	if req.DueDate != nil {
+		parsedTime, _ := time.Parse(time.RFC3339, *req.DueDate)
+		dueDate := gorm.DeletedAt{Time: parsedTime, Valid: true}
+		newTodo.DueDate = &dueDate
 	}
 
 	return s.repo.Create(newTodo)
 }
 
-func (s *TodoService) UpdateTodo(id int, req models.UpdateTodoRequest) (*models.Todo, error) {
+func (s *TodoService) UpdateTodo(id uint, req models.UpdateTodoRequest) (*models.Todo, error) {
+	existingTodo, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := utils.ValidatePriority(req.Priority); err != nil {
 		return nil, err
 	}
@@ -61,61 +64,34 @@ func (s *TodoService) UpdateTodo(id int, req models.UpdateTodoRequest) (*models.
 		}
 	}
 
-	if _, err := s.repo.GetByID(id); err != nil {
-		return nil, err
+	existingTodo.Title = req.Title
+	existingTodo.Completed = req.Completed
+	existingTodo.Category = req.Category
+	existingTodo.Priority = strings.Title(strings.ToLower(req.Priority))
+
+	if req.Completed && existingTodo.CompletedAt == nil {
+		now := gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
+		existingTodo.CompletedAt = &now
+	} else if !req.Completed {
+		existingTodo.CompletedAt = nil
 	}
 
-	var dueDate sql.NullString
 	if req.DueDate != nil {
-		dueDate.String = *req.DueDate
-		dueDate.Valid = true
+		parsedTime, _ := time.Parse(time.RFC3339, *req.DueDate)
+		dueDate := gorm.DeletedAt{Time: parsedTime, Valid: true}
+		existingTodo.DueDate = &dueDate
+	} else {
+		existingTodo.DueDate = nil
 	}
 
-	var completedAt sql.NullString
-	if req.Completed {
-		completedAt.String = time.Now().UTC().Format(time.RFC3339)
-		completedAt.Valid = true
-	}
-
-	updatedTodo := models.Todo{
-		Title:       req.Title,
-		Completed:   req.Completed,
-		Category:    req.Category,
-		Priority:    strings.Title(strings.ToLower(req.Priority)),
-		DueDate:     dueDate,
-		CompletedAt: completedAt,
-	}
-
-	return s.repo.Update(id, updatedTodo)
-}
-
-func (s *TodoService) GetAllTodos() ([]models.Todo, error) {
-	return s.repo.GetAll()
-}
-func (s *TodoService) GetTodoByID(id int) (*models.Todo, error) {
-	return s.repo.GetByID(id)
-}
-func (s *TodoService) GetTodosByCategory(category string) ([]models.Todo, error) {
-	return s.repo.GetByCategory(category)
-}
-func (s *TodoService) GetTodosByStatus(completed bool) ([]models.Todo, error) {
-	return s.repo.GetByStatus(completed)
-}
-func (s *TodoService) SearchTodosByTitle(query string) ([]models.Todo, error) {
-	return s.repo.SearchByTitle(query)
-}
-func (s *TodoService) DeleteTodo(id int) error {
-	return s.repo.Delete(id)
-}
-func (s *TodoService) DeleteAllTodos() error {
-	return s.repo.DeleteAll()
+	return s.repo.Update(existingTodo)
 }
 
 func (s *TodoService) UpdateStatusByCategory(category string, completed bool) ([]models.Todo, error) {
-	var completedAt sql.NullString
+	var completedAt *gorm.DeletedAt
 	if completed {
-		completedAt.String = time.Now().UTC().Format(time.RFC3339)
-		completedAt.Valid = true
+		now := gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
+		completedAt = &now
 	}
 
 	err := s.repo.UpdateStatusByCategory(category, completed, completedAt)
@@ -124,4 +100,32 @@ func (s *TodoService) UpdateStatusByCategory(category string, completed bool) ([
 	}
 
 	return s.repo.GetByCategory(category)
+}
+
+func (s *TodoService) GetAllTodos() ([]models.Todo, error) {
+	return s.repo.GetAll()
+}
+
+func (s *TodoService) GetTodoByID(id uint) (*models.Todo, error) {
+	return s.repo.GetByID(id)
+}
+
+func (s *TodoService) GetTodosByCategory(category string) ([]models.Todo, error) {
+	return s.repo.GetByCategory(category)
+}
+
+func (s *TodoService) GetTodosByStatus(completed bool) ([]models.Todo, error) {
+	return s.repo.GetByStatus(completed)
+}
+
+func (s *TodoService) SearchTodosByTitle(query string) ([]models.Todo, error) {
+	return s.repo.SearchByTitle(query)
+}
+
+func (s *TodoService) DeleteTodo(id uint) error {
+	return s.repo.Delete(id)
+}
+
+func (s *TodoService) DeleteAllTodos() error {
+	return s.repo.DeleteAll()
 }
