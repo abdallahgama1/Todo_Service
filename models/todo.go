@@ -1,16 +1,18 @@
 package models
 
-import "gorm.io/gorm"
+import "database/sql"
 
 type Todo struct {
-	gorm.Model        // Embedded struct
-	Title      string `json:"title"`
-	Completed  bool   `json:"completed"`
-	Category   string `json:"category"`
-	Priority   string `json:"priority"`
+	ID          int            `json:"id"`
+	Title       string         `json:"title"`
+	Completed   bool           `json:"completed"`
+	Category    string         `json:"category"`
+	Priority    string         `json:"priority"`
+	CompletedAt sql.NullString `json:"completedAt"`
+	DueDate     sql.NullString `json:"dueDate"`
+	UserID      uint            `json:"userId"`
+	User        User            `json:"-"` 
 
-	CompletedAt *gorm.DeletedAt `json:"completedAt" gorm:"index"`
-	DueDate     *gorm.DeletedAt `json:"dueDate"`
 }
 
 type CreateTodoRequest struct {
