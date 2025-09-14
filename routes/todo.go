@@ -2,26 +2,29 @@ package routes
 
 import (
 	"Todo_Service/handlers"
+	"Todo_Service/middlewares"
 
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(h *handlers.TodoHandler) *gin.Engine {
-	router := gin.Default()
-
+func RegisterTodoRoutes(router *gin.Engine, todoHandler *handlers.TodoHandler) {
 	todoRoutes := router.Group("/todos")
-	{
-		todoRoutes.GET("", h.GetAllTodos)
-		todoRoutes.GET("/:id", h.GetTodoByID)
-		todoRoutes.GET("/category/:category", h.GetTodosByCategory)
-		todoRoutes.GET("/status/:status", h.GetTodosByStatus)
-		todoRoutes.GET("/search", h.SearchTodosByTitle)
-		todoRoutes.POST("", h.CreateTodo)
-		todoRoutes.PUT("/:id", h.UpdateTodo)
-		todoRoutes.PUT("/category/:category", h.UpdateStatusByCategory)
-		todoRoutes.DELETE("/:id", h.DeleteTodo)
-		todoRoutes.DELETE("", h.DeleteAllTodos)
-	}
 
-	return router
+	todoRoutes.Use(middlewares.AuthMiddleware())
+	{
+		todoRoutes.POST("", todoHandler.CreateTodo)
+		todoRoutes.GET("", todoHandler.GetAllTodos)
+
+		todoRoutes.GET("/:id", todoHandler.GetTodoByID)
+		todoRoutes.PUT("/:id", todoHandler.UpdateTodo)
+		todoRoutes.DELETE("/:id", todoHandler.DeleteTodo)
+		
+		todoRoutes.GET("/category/:category", todoHandler.GetTodosByCategory)
+		todoRoutes.PUT("/category/:category", todoHandler.UpdateStatusByCategory)
+		
+		todoRoutes.GET("/status/:status", todoHandler.GetTodosByStatus)
+		todoRoutes.GET("/search", todoHandler.SearchTodosByTitle)
+
+		todoRoutes.DELETE("", todoHandler.DeleteAllTodos)
+	}
 }

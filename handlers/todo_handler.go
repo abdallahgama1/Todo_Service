@@ -18,24 +18,22 @@ func NewTodoHandler(service *services.TodoService) *TodoHandler {
 	return &TodoHandler{service: service}
 }
 
+
 func (h *TodoHandler) CreateTodo(c *gin.Context) {
 	var req models.CreateTodoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if strings.TrimSpace(req.Title) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Title cannot be empty"})
+
+	userId, exists := c.Get("userId")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
 		return
 	}
 
-	todo, err := h.service.CreateTodo(req)
+	todo, err := h.service.CreateTodo(req, userId.(uint))
 	if err != nil {
-		// Custom validation errors
-		if strings.Contains(err.Error(), "priority") || strings.Contains(err.Error(), "dueDate") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create todo"})
 		return
 	}

@@ -10,6 +10,9 @@ type Todo struct {
 	Priority    string         `json:"priority"`
 	CompletedAt sql.NullString `json:"completedAt"`
 	DueDate     sql.NullString `json:"dueDate"`
+	UserID      uint            `json:"userId"`
+	User        User            `json:"-"` 
+
 }
 
 type CreateTodoRequest struct {
