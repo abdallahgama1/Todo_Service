@@ -1,0 +1,342 @@
+basePath: /
+definitions:
+  gorm.DeletedAt:
+    properties:
+      time:
+        type: string
+      valid:
+        description: Valid is true if Time is not NULL
+        type: boolean
+    type: object
+  models.CreateTodoRequest:
+    properties:
+      category:
+        type: string
+      completed:
+        type: boolean
+      dueDate:
+        type: string
+      priority:
+        type: string
+      title:
+        type: string
+    required:
+    - category
+    - priority
+    - title
+    type: object
+  models.LoginInput:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.RegisterInput:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.Todo:
+    properties:
+      category:
+        type: string
+      completed:
+        type: boolean
+      completedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      dueDate:
+        $ref: '#/definitions/gorm.DeletedAt'
+      id:
+        type: integer
+      priority:
+        type: string
+      title:
+        type: string
+      updatedAt:
+        type: string
+      userId:
+        type: integer
+    type: object
+  models.UpdateTodoRequest:
+    properties:
+      category:
+        type: string
+      completed:
+        type: boolean
+      dueDate:
+        type: string
+      priority:
+        type: string
+      title:
+        type: string
+    required:
+    - category
+    - priority
+    - title
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+    url: http://example.com/support
+  description: A complete Todo application API with user authentication.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Todo App API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Log in with username and password to receive a JWT token
+      parameters:
+      - description: Login Credentials
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid credentials
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Log in a user
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account with a username and password
+      parameters:
+      - description: Registration Info
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid input or user already exists
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - auth
+  /todos:
+    get:
+      description: Retrieves a list of all todo items belonging to the authenticated
+        user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Todo'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get all todos for the current user
+      tags:
+      - todos
+    post:
+      consumes:
+      - application/json
+      description: Adds a new todo item to the user's list
+      parameters:
+      - description: Todo Info
+        in: body
+        name: todo
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateTodoRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Todo'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new todo
+      tags:
+      - todos
+  /todos/{id}:
+    delete:
+      description: Deletes a todo item owned by the user
+      parameters:
+      - description: Todo ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a todo
+      tags:
+      - todos
+    get:
+      description: Get details of a specific todo owned by the user
+      parameters:
+      - description: Todo ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Todo'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get a single todo by its ID
+      tags:
+      - todos
+    put:
+      consumes:
+      - application/json
+      description: Update the details of a todo item owned by the user
+      parameters:
+      - description: Todo ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated Todo Info
+        in: body
+        name: todo
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateTodoRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Todo'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update an existing todo
+      tags:
+      - todos
+securityDefinitions:
+  ApiKeyAuth:
+    description: '"Type ''Bearer'' followed by a space and a JWT token."'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
